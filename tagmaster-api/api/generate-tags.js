@@ -13,7 +13,6 @@ export default async function handler(req, res) {
 
   const { title, spyUrl } = req.body;
 
-  // Spy mode - fake competitor tags
   if (spyUrl) {
     const fakeSpyTags = [
       "competitor tag 1", "competitor tag 2", "best seller gift",
@@ -24,7 +23,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true, spyTags: fakeSpyTags });
   }
 
-  // Generate mode - fake tags based on title
   if (!title || title.length < 3) {
     return res.status(400).json({ error: 'Title too short' });
   }
