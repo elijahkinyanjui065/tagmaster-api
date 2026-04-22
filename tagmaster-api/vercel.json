@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/generate-tags.js": {
+      "maxDuration": 30
+    }
+  }
+}
