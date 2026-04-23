@@ -1,7 +1,7 @@
 const trademarks = require('./trademarks.js');
 
 module.exports = async (req, res) => {
-  // Fix CORS so Zazzle can call it
+  // These 3 lines MUST be first before any other code
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -15,15 +15,20 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { title, description } = req.body;
+    const { title = '', description = '' } = req.body || {};
     
-    // Replace this with your real tag logic later
-    const fakeTags = ['tag1', 'tag2', 'tag3', 'zazzle', 'gift', 'custom'];
+    // Basic tag generation - no fancy stuff that can break
+    const text = `${title} ${description}`.toLowerCase();
+    const words = text.match(/\b[a-z]{3,}\b/g) || [];
+    const uniqueWords = [...new Set(words)];
     
-    // Filter out trademarks
-    const safeTags = fakeTags.filter(tag => !trademarks.includes(tag.toLowerCase()));
+    // Remove trademarks
+    const safeTags = uniqueWords.filter(tag => !trademarks.includes(tag));
     
-    return res.status(200).json({ success: true, tags: safeTags });
+    return res.status(200).json({ 
+      success: true, 
+      tags: safeTags.slice(0, 20) 
+    });
     
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
