@@ -1,4 +1,4 @@
-module.exports = [
+export default [
   'disney','walt disney','pixar','mickey mouse','minnie mouse','donald duck',
   'goofy','pluto','daisy duck','dumbo','bambi','cinderella','snow white',
   'sleeping beauty','the little mermaid','ariel','belle','jasmine','mulan',
