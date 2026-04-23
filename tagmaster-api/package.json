@@ -1,6 +1,9 @@
 {
   "name": "tagmaster-api",
   "version": "1.0.0",
+  "description": "Tag Master API for Zazzle extension",
   "type": "module",
-  "dependencies": {}
+  "engines": {
+    "node": ">=18.x"
+  }
 }
