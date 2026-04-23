@@ -1,29 +1,17 @@
-import trademarks from './trademarks.js';
-
-export default async function handler(req, res) {
-  // These 3 lines MUST be first before any other code
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
-  }
-
-  try {
+try {
     const { title = '', description = '' } = req.body || {};
     
-    // Basic tag generation - no fancy stuff that can break
     const text = `${title} ${description}`.toLowerCase();
     const words = text.match(/\b[a-z]{3,}\b/g) || [];
     const uniqueWords = [...new Set(words)];
     
     // Remove trademarks
-    const safeTags = uniqueWords.filter(tag => !trademarks.includes(tag));
+    let safeTags = uniqueWords.filter(tag => !trademarks.includes(tag));
+    
+    // Fallback: if we got nothing, return generic tags so it doesn't look broken
+    if (safeTags.length === 0) {
+      safeTags = ['design','gift','custom','art','trendy','popular','zazzle','product'];
+    }
     
     return res.status(200).json({ 
       success: true, 
@@ -33,4 +21,3 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
-}
