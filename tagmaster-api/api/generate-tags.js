@@ -1,4 +1,7 @@
-export default async function handler(req, res) {
+const trademarks = require('./trademarks.js');
+
+module.exports = async (req, res) => {
+  // Fix CORS so Zazzle can call it
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -7,41 +10,22 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  if (req.method!== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  const { title, spyUrl } = req.body;
-
-  if (spyUrl) {
-    const fakeSpyTags = [
-      "competitor tag 1", "competitor tag 2", "best seller gift",
-      "trending product", "popular item", "top rated",
-      "customer favorite", "hot item", "must have",
-      "viral product", "amazon choice", "etsy bestseller", "tiktok viral"
-    ];
-    return res.status(200).json({ success: true, spyTags: fakeSpyTags });
+  try {
+    const { title, description } = req.body;
+    
+    // Replace this with your real tag logic later
+    const fakeTags = ['tag1', 'tag2', 'tag3', 'zazzle', 'gift', 'custom'];
+    
+    // Filter out trademarks
+    const safeTags = fakeTags.filter(tag => !trademarks.includes(tag.toLowerCase()));
+    
+    return res.status(200).json({ success: true, tags: safeTags });
+    
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
-
-  if (!title || title.length < 3) {
-    return res.status(400).json({ error: 'Title too short' });
-  }
-
-  const fakeTags = [
-    `${title.toLowerCase()} gift`,
-    `funny ${title.toLowerCase()}`,
-    `${title.toLowerCase()} birthday`,
-    `unique ${title.toLowerCase()}`,
-    `${title.toLowerCase()} for her`,
-    `${title.toLowerCase()} for him`,
-    `custom ${title.toLowerCase()}`,
-    `${title.toLowerCase()} present`,
-    `best ${title.toLowerCase()}`,
-    `${title.toLowerCase()} idea`,
-    `cool ${title.toLowerCase()}`,
-    `${title.toLowerCase()} lover`,
-    `new ${title.toLowerCase()}`
-  ];
-
-  return res.status(200).json({ success: true, tags: fakeTags });
-}
+};
