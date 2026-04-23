@@ -1,6 +1,6 @@
-const trademarks = require('./trademarks.js');
+import trademarks from './trademarks.js';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // These 3 lines MUST be first before any other code
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -33,4 +33,4 @@ module.exports = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
-};
+}
