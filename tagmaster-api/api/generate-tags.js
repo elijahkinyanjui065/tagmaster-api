@@ -1,107 +1,124 @@
-// api/generate-tags.js  (Vercel serverless handler example)
+/* api/generate-tags.js — Universal SEO Engine */
 
-const TRADEMARKS = [ /* your trademark list here */ ];
+// 1. THE SAFETY VAULT (Trademarks/Banned Words)
+const TRADEMARKS = [
+  'disney', 'marvel', 'nike', 'adidas', 'star wars', 'pokemon', 'barbie',
+  'customized', 'personalized', 'cheap', 'best' // Zazzle-prohibited or low-value
+];
 
-// Minimal local fallback generator (keeps response deterministic)
-function localFallbackTags(title = '') {
-  const raw = (title || '').toLowerCase().trim();
-  const words = raw.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
-  const primary = words[0] || 'design';
-  const product = words.find(w => /(shirt|mug|poster|card|sticker|tote|pillow|invitation)/.test(w)) || 'design';
-  const out = [
-    `${primary} ${product}`,
-    `${primary} gift`,
-    `gift for her`,
-    `gift for kids`,
-    `${primary} ${product}`,
-    `${primary} design`,
-    `${primary} ${product}`,
-    `${primary} ${product}`,
-    `${primary} ${product}`,
-    `${primary} ${product}`
-  ].slice(0, 10);
+// 2. THE UNIVERSAL FORMULA ENGINE (Server-Side)
+function buildUniversalTags(input = '') {
+  const raw = input.toLowerCase().trim();
+  const out = [];
+
+  // Helper: Validates tag against universal 2-3 word rule
+  function add(tag) {
+    const s = tag?.toLowerCase().trim().replace(/\s+/g, ' ');
+    const words = s ? s.split(' ').length : 0;
+    if (s && words >= 2 && words <= 3 && s.length <= 24 && !out.includes(s)) {
+      out.push(s);
+    }
+  }
+
+  // Extract Core Pillars
+  const productMatch = raw.match(/(shirt|mug|poster|card|sticker|tote|pillow|invitation|label|tag)/i);
+  const product = productMatch ? productMatch[0] : 'gift';
+  
+  const tokens = raw.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !['the','and','for','with'].includes(w));
+  const primary = tokens[0] || 'design';
+
+  // Apply Formula
+  add(`${primary} ${product}`); // Anchor
+  
+  // Logic-based variations
+  if (raw.includes('wedding')) {
+    add('wedding invitation');
+    add('modern wedding');
+    add('elegant invite');
+  } else if (raw.includes('birthday')) {
+    add('birthday gift');
+    add('happy birthday');
+    add(`birthday ${product}`);
+  } else {
+    add(`${primary} gift`);
+    add('gift for him');
+    add('gift for her');
+  }
+
+  // Style/Context Layer
+  const styles = ['watercolor', 'vintage', 'minimalist', 'floral', 'retro', 'modern'];
+  const foundStyle = styles.find(s => raw.includes(s));
+  if (foundStyle) {
+    add(`${foundStyle} ${product}`);
+    add(`${primary} ${foundStyle}`);
+  }
+
+  // Search-Pattern Layer
+  add(`unique ${product}`);
+  add(`${primary} art`);
+  add(`${primary} design`);
+
+  // Finalization: Return unique array
   return out;
 }
 
-// Optional: simple trademark filter (keeps server-side safety)
+// 3. THE IP FILTER
 function ipFilter(tags = []) {
-  try {
-    return tags.filter(tag => {
-      if (!tag) return false;
-      const t = tag.toLowerCase();
-      if (t.length < 2) return false;
-      return !TRADEMARKS.some(tm => t.includes(tm));
-    });
-  } catch (e) {
-    return tags;
-  }
+  return tags.filter(tag => {
+    const t = tag.toLowerCase();
+    return !TRADEMARKS.some(tm => t.includes(tm));
+  });
 }
 
-// Helper: consistent JSON response
-function jsonResponse(res, status = 200, payload = {}) {
-  res.status(status).json(payload);
-}
-
-// Exported handler
+// 4. EXPORTED HANDLER
 export default async function handler(req, res) {
-  // 1) CORS headers first, always
+  // CORS Setup
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // 2) Wrap everything in try/catch so we never crash without a response
   try {
-    if (req.method !== 'POST') {
-      return jsonResponse(res, 405, { success: false, error: 'Method not allowed' });
-    }
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-    const body = req.body || {};
-    const title = (body.title || '').toString().trim();
-    const spyUrl = (body.spyUrl || '').toString().trim();
+    const { title, spyUrl } = req.body;
+    const input = title || spyUrl || '';
 
-    if (!title && !spyUrl) {
-      return jsonResponse(res, 200, { success: false, tags: [], error: 'Missing title or spyUrl' });
-    }
+    if (!input) return res.status(200).json({ success: false, tags: [] });
 
-    // If you have a buildTags function defined elsewhere, call it safely.
-    // If it throws or is undefined, fall back to localFallbackTags.
-    let tags = [];
-    try {
-      if (typeof buildTags === 'function') {
-        tags = buildTags(title || spyUrl);
-      } else {
-        // buildTags not defined — use local fallback
-        tags = localFallbackTags(title || spyUrl);
-      }
-    } catch (innerErr) {
-      console.error('buildTags error, using fallback:', innerErr && innerErr.message);
-      tags = localFallbackTags(title || spyUrl);
-    }
+    // Generate using Universal Formula
+    let tags = buildUniversalTags(input);
 
-    // Server-side sanitize: lowercase, trim, remove bad chars, dedupe, limit 10
-    tags = tags
-      .map(t => (t || '').toLowerCase().trim().replace(/[&#]/g, ''))
-      .filter(t => t && t.length >= 2 && t.length <= 24)
+    // Filter and Sanitize
+    tags = ipFilter(tags)
+      .map(t => t.replace(/[&#]/g, ''))
       .filter((t, i, arr) => arr.indexOf(t) === i)
       .slice(0, 10);
 
-    // Trademark filter
-    tags = ipFilter(tags);
-
-    // Final safety: ensure exactly 10 tags by deterministic backfill
-    const filler = tags[0] || (title ? `${title.split(/\s+/)[0]} design` : 'design');
+    // Deterministic Backfill (Safety check for exactly 10)
+    const primaryWord = input.split(/\s+/)[0] || 'design';
+    const filler = `${primaryWord} gift`.toLowerCase();
+    
+    let attempts = 0;
+    while (tags.length < 10 && attempts < 10) {
+      const extra = [`unique gift`, `${primaryWord} art`, `cool ${primaryWord}`][attempts % 3];
+      if (!tags.includes(extra)) tags.push(extra);
+      attempts++;
+    }
+    
+    // Final hard-fill if needed
     while (tags.length < 10) tags.push(filler);
 
-    return jsonResponse(res, 200, { success: true, tags, count: tags.length });
+    return res.status(200).json({
+      success: true,
+      tags: tags.slice(0, 10),
+      count: 10,
+      engine: "Universal_v2"
+    });
 
   } catch (err) {
-    // 3) Catch-all: log and return safe JSON (never crash)
-    console.error('API handler error:', err && err.stack ? err.stack : err);
-    return jsonResponse(res, 200, { success: false, tags: [], error: 'internal_error' });
+    console.error('API Error:', err);
+    return res.status(200).json({ success: false, tags: [], error: 'internal_error' });
   }
 }
