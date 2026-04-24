@@ -1,40 +1,21 @@
-export default [
-  'disney','walt disney','pixar','mickey mouse','minnie mouse','donald duck',
-  'goofy','pluto','daisy duck','dumbo','bambi','cinderella','snow white',
-  'sleeping beauty','the little mermaid','ariel','belle','jasmine','mulan',
-  'pocahontas','tiana','rapunzel','merida','moana','raya','encanto','mirabel',
-  'frozen','elsa','anna','olaf','sven','toy story','woody','buzz lightyear',
-  'finding nemo','dory','the incredibles','cars','lightning mcqueen',
-  'wall-e','up','inside out','coco','soul','luca','turning red',
-  'star wars','lucasfilm','darth vader','luke skywalker','yoda','r2d2','c3po',
-  'stormtrooper','jedi','sith','mandalorian','baby yoda','grogu','rey',
-  'han solo','chewbacca','millennium falcon','death star','lightsaber',
-  'indiana jones','marvel','avengers','iron man','captain america','thor','hulk',
-  'black widow','spider-man','spiderman','black panther','doctor strange','ant-man',
-  'guardians of the galaxy','groot','rocket raccoon','deadpool','wolverine',
-  'x-men','fantastic four','thanos','hawkeye','scarlet witch','vision',
-  'winter soldier','falcon','war machine','captain marvel','dc comics','batman',
-  'superman','wonder woman','aquaman','the flash','green lantern','joker',
-  'harley quinn','catwoman','lex luthor','shazam','cyborg','justice league',
-  'gotham','metropolis','nightwing','warner bros','harry potter','hermione',
-  'ron weasley','dumbledore','hogwarts','gryffindor','slytherin','hufflepuff',
-  'ravenclaw','voldemort','fantastic beasts','newt scamander','lord of the rings',
-  'hobbit','gandalf','frodo','bilbo','sauron','gollum','game of thrones',
-  'jon snow','daenerys','house of dragon','looney tunes','bugs bunny',
-  'daffy duck','tweety','sylvester','tom and jerry','scooby doo',
-  'flintstones','jetsons','stranger things','eleven','hawkins','squid game',
-  'bridgerton','the witcher','geralt','wednesday addams','cobra kai','spongebob',
-  'patrick star','squidward','bikini bottom','dora the explorer','paw patrol',
-  'teenage mutant ninja turtles','tmnt','rugrats','avatar the last airbender',
-  'adventure time','steven universe','regular show','powerpuff girls',
-  'dexter laboratory','bluey','the simpsons','homer simpson','bart simpson',
-  'family guy','peter griffin','futurama','bender','south park','cartman',
-  'bob burgers','king of the hill','pokemon','pikachu','charizard','mewtwo',
-  'eevee','snorlax','pokeball','dragon ball','goku','vegeta','naruto','sasuke',
-  'itachi','kakashi','one piece','luffy','attack on titan','eren','levi ackerman',
-  'demon slayer','tanjiro','nezuko','rengoku','my hero academia','deku','bakugo',
-  'todoroki','jujutsu kaisen','gojo','bleach','ichigo','fullmetal alchemist',
-  'edward elric','death note','chainsaw man','spy x family','hello kitty',
-  'sanrio','kuromi','cinnamoroll','nintendo','mario','luigi','princess peach',
-  'bowser','yoshi','toad','zelda','link','ganondorf','hyrule','triforce'
+// lib/trademark-filter.js
+// Zazzle Tags Master - Trademark Filter Module
+
+const TRADEMARKS = [
+  'disney','marvel','pokemon','nintendo','barbie','hello kitty','star wars',
+  'harry potter','minecraft','fortnite','pixar','dreamworks','nickelodeon',
+  'lego','superman','batman','spiderman','avengers','frozen','moana',
+  'star trek','lord of the rings','dc comics','mickey','minnie','peppa pig',
+  'paw patrol','bluey','sesame street','dr seuss'
 ];
+
+export function ipFilter(tags) {
+  const blocked = [];
+  const safe = tags.filter(tag => {
+    const t = tag.toLowerCase();
+    const hit = TRADEMARKS.find(tm => t.includes(tm));
+    if (hit) blocked.push({ tag, reason: hit });
+    return !hit && t.length >= 3;
+  });
+  return { safe, blocked };
+}
