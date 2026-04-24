@@ -1,108 +1,107 @@
-// ---------- UNIVERSAL TAG FORMULA (category‑agnostic) - IMPROVED ----------
+// api/generate-tags.js  (Vercel serverless handler example)
 
-// Start fresh for this layer
-const out = []; // replace or ensure this is the array you use for tags
+const TRADEMARKS = [ /* your trademark list here */ ];
 
-// Local helper to add a tag deterministically (no duplicates, validated)
-function addTag(tag) {
-  if (!tag || typeof tag !== 'string') return false;
-  const s = tag.toLowerCase().trim().replace(/\s+/g, ' ');
-  if (!isValidTag(s)) return false;
-  if (out.includes(s)) return false;
-  out.push(s);
-  return true;
+// Minimal local fallback generator (keeps response deterministic)
+function localFallbackTags(title = '') {
+  const raw = (title || '').toLowerCase().trim();
+  const words = raw.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+  const primary = words[0] || 'design';
+  const product = words.find(w => /(shirt|mug|poster|card|sticker|tote|pillow|invitation)/.test(w)) || 'design';
+  const out = [
+    `${primary} ${product}`,
+    `${primary} gift`,
+    `gift for her`,
+    `gift for kids`,
+    `${primary} ${product}`,
+    `${primary} design`,
+    `${primary} ${product}`,
+    `${primary} ${product}`,
+    `${primary} ${product}`,
+    `${primary} ${product}`
+  ].slice(0, 10);
+  return out;
 }
 
-// Deterministic primaryProduct (tag #1)
-const primaryProduct = product && isValidTag(`${primary} ${product}`)
-  ? `${primary} ${product}`.toLowerCase()
-  : `${primary} design`.toLowerCase();
-addTag(primaryProduct);
-
-// 2. BUYER‑INTENT LAYER (must have at least 2)
-if (occasion) {
-  addTag(`${occasion} gift`);
-}
-
-// Audience‑specific gift (never "gift for general")
-if (audience === 'kids') {
-  addTag('gift for kids');
-} else if (audience === 'men' || audience === 'dad') {
-  addTag('gift for him');
-  if (occasion && audience !== 'kids') addTag(`${occasion} for him`);
-} else if (audience === 'women' || audience === 'mom') {
-  addTag('gift for her');
-  if (occasion && audience !== 'kids') addTag(`${occasion} for her`);
-} else {
-  // neutral fallback (deterministic)
-  addTag('gift for him');
-}
-
-// Ensure at least 2 gift-intent tags (deterministic fallback)
-const giftCount = out.filter(x => x.includes('gift')).length;
-if (giftCount < 2) {
-  const secondGift = audience === 'men' ? 'gift for him'
-                    : audience === 'women' ? 'gift for her'
-                    : 'gift for him';
-  addTag(secondGift);
-}
-
-// 3. AUDIENCE + PRODUCT (if audience exists and not general)
-if (audience && audience !== 'general' && product) {
-  addTag(`${audience} ${product}`);
-}
-
-// 4. SEARCH COMBOS (core buyer queries)
-if (occasion) addTag(`${primary} ${occasion}`);
-if (style) addTag(`${primary} ${style}`);
-if (style && occasion) addTag(`${style} ${occasion}`);
-
-// 5. LONG‑TAIL / OCCASION‑STYLE‑PRODUCT
-if (style && occasion && product) addTag(`${style} ${occasion} ${product}`);
-if (style && product) addTag(`${style} ${product}`);
-if (occasion && product) addTag(`${occasion} ${product}`);
-
-// 6. NICHE / EXTRA‑IDENTITY (1–2 max)
-if (foundIcon) {
-  // icon + product
-  addTag(product ? `${foundIcon} ${product}` : `${foundIcon} ${occasion || 'design'}`);
-  // occasion + icon + product (only if it passes validation)
-  if (occasion && product) addTag(`${occasion} ${foundIcon} ${product}`);
-}
-
-// 7. UTILITY‑STYLE FOR NON‑GIFT CATEGORIES
-if (product === 'card' || product === 'invitation' || product === 'label') {
-  addTag(`${product} design`);
-  addTag(`${product} template`);
-  // Only add a gift tag if title hints at gift
-  if (t.includes('gift') || t.includes('her') || t.includes('him')) {
-    const safeGift = audience === 'men' ? 'gift for him'
-                      : audience === 'women' ? 'gift for her'
-                      : 'gift for him';
-    addTag(safeGift);
+// Optional: simple trademark filter (keeps server-side safety)
+function ipFilter(tags = []) {
+  try {
+    return tags.filter(tag => {
+      if (!tag) return false;
+      const t = tag.toLowerCase();
+      if (t.length < 2) return false;
+      return !TRADEMARKS.some(tm => t.includes(tm));
+    });
+  } catch (e) {
+    return tags;
   }
 }
 
-// FINALIZE: Deduplicate already handled by addTag; ensure exactly 10 tags
-
-// Deterministic filler (primaryProduct is preferred)
-const filler = isValidTag(primaryProduct) ? primaryProduct : `${primary} design`.toLowerCase();
-
-// If some tags were filtered out earlier, ensure we still have 10 by backfilling with filler
-while (out.length < 10) {
-  // allow repeated filler to reach 10 (Zazzle accepts repeats in practice; this keeps deterministic behavior)
-  out.push(filler);
+// Helper: consistent JSON response
+function jsonResponse(res, status = 200, payload = {}) {
+  res.status(status).json(payload);
 }
 
-// Final safety pass: enforce constraints and trim to 10
-const final = out
-  .map(s => s.toLowerCase().trim().replace(/\s+/g, ' '))
-  .filter(s => isValidTag(s))
-  .slice(0, 10);
+// Exported handler
+export default async function handler(req, res) {
+  // 1) CORS headers first, always
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-// If anything removed by final filter, backfill again
-while (final.length < 10) final.push(filler);
+  // Preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
-// Replace your working array with final (or return final if function scope)
-out.length = 0;
-final.forEach(t => out.push(t));
+  // 2) Wrap everything in try/catch so we never crash without a response
+  try {
+    if (req.method !== 'POST') {
+      return jsonResponse(res, 405, { success: false, error: 'Method not allowed' });
+    }
+
+    const body = req.body || {};
+    const title = (body.title || '').toString().trim();
+    const spyUrl = (body.spyUrl || '').toString().trim();
+
+    if (!title && !spyUrl) {
+      return jsonResponse(res, 200, { success: false, tags: [], error: 'Missing title or spyUrl' });
+    }
+
+    // If you have a buildTags function defined elsewhere, call it safely.
+    // If it throws or is undefined, fall back to localFallbackTags.
+    let tags = [];
+    try {
+      if (typeof buildTags === 'function') {
+        tags = buildTags(title || spyUrl);
+      } else {
+        // buildTags not defined — use local fallback
+        tags = localFallbackTags(title || spyUrl);
+      }
+    } catch (innerErr) {
+      console.error('buildTags error, using fallback:', innerErr && innerErr.message);
+      tags = localFallbackTags(title || spyUrl);
+    }
+
+    // Server-side sanitize: lowercase, trim, remove bad chars, dedupe, limit 10
+    tags = tags
+      .map(t => (t || '').toLowerCase().trim().replace(/[&#]/g, ''))
+      .filter(t => t && t.length >= 2 && t.length <= 24)
+      .filter((t, i, arr) => arr.indexOf(t) === i)
+      .slice(0, 10);
+
+    // Trademark filter
+    tags = ipFilter(tags);
+
+    // Final safety: ensure exactly 10 tags by deterministic backfill
+    const filler = tags[0] || (title ? `${title.split(/\s+/)[0]} design` : 'design');
+    while (tags.length < 10) tags.push(filler);
+
+    return jsonResponse(res, 200, { success: true, tags, count: tags.length });
+
+  } catch (err) {
+    // 3) Catch-all: log and return safe JSON (never crash)
+    console.error('API handler error:', err && err.stack ? err.stack : err);
+    return jsonResponse(res, 200, { success: false, tags: [], error: 'internal_error' });
+  }
+}
