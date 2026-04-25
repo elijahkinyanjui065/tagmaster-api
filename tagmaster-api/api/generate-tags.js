@@ -1,21 +1,21 @@
-/* TagMaster Pro — content.js v3.0 Engine */
+/* TagMaster Pro — content.js v3.0 FINAL (2026 Spec) */
 
 const API = 'https://tagmaster-api.vercel.app/api/generate-tags';
 
-console.log('[TagMaster] Loaded:', window.location.href);
+console.log('[TagMaster] Loaded v3.0:', window.location.href);
 
 // ── MESSAGE LISTENER ─────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.action === 'generate') {
     generateAndApply()
-    .then(() => sendResponse({ ok: true }))
-    .catch(e => sendResponse({ error: e.message }));
+   .then(() => sendResponse({ ok: true }))
+   .catch(e => sendResponse({ error: e.message }));
     return true;
   }
   if (msg.action === 'spy') {
     spyAndApply(msg.url)
-    .then(() => sendResponse({ ok: true }))
-    .catch(e => sendResponse({ error: e.message }));
+   .then(() => sendResponse({ ok: true }))
+   .catch(e => sendResponse({ error: e.message }));
     return true;
   }
 });
@@ -30,8 +30,8 @@ function getTitle() {
     document.querySelector('input[name="product_title"]'),
     document.querySelector('[data-testid="product-title"]'),
     document.querySelector('[data-testid="product-title-input"]'),
-   ...[...document.querySelectorAll('input[type="text"]')]
-    .filter(i => i.offsetWidth > 200 && i.offsetParent!== null),
+  ...[...document.querySelectorAll('input[type="text"]')]
+   .filter(i => i.offsetWidth > 200 && i.offsetParent!== null),
   ];
 
   for (const el of candidates) {
@@ -63,9 +63,9 @@ function findTagContainer() {
   );
 }
 
-// ── V3.0 DETECTORS ───────────────────────────────────────────
+// ── V3.0 CONSTANTS & DETECTORS ───────────────────────────────
 const BLACKLIST = ['custom', 'personalized', 'customizable', 'gift idea', 'sale', 'cheap', 'best'];
-const PRODUCT_TYPES = ['mug', 'shirt', 'tee', 'card', 'sticker', 'poster', 'pillow', 'tote', 'bag', 'ornament', 'print'];
+const PRODUCT_TYPES = ['mug', 'shirt', 'tee', 'tshirt', 'card', 'sticker', 'poster', 'pillow', 'tote', 'bag', 'ornament', 'print', 'invitation'];
 const ALCOHOL_TRIGGERS = ['beer stein', 'shot glass', 'wine label', 'flask', 'barware', 'coaster', 'beer', 'wine', 'alcohol', 'whiskey'];
 
 function cleanText(str) {
@@ -89,7 +89,7 @@ function detectOccasion(t){
 }
 
 function detectStyle(t){
-  if(/\b(floral|flower|botanical|bloom|rose|peony)\b/i.test(t)) return 'Floral';
+  if(/\b(floral|flower|botanical|bloom|rose|peony|daisy)\b/i.test(t)) return 'Floral';
   if(/\b(cute|kawaii|adorable)\b/i.test(t)) return 'Cute';
   if(/\b(vintage|retro|antique|classic)\b/i.test(t)) return 'Vintage';
   if(/\b(colorful|rainbow|bright|vibrant)\b/i.test(t)) return 'Colorful';
@@ -108,15 +108,18 @@ function detectProductType(t){
   if(/\b(pillow|throw|cushion)\b/i.test(t)) return 'pillow';
   if(/\b(tote|bag)\b/i.test(t)) return 'tote';
   if(/\b(sticker|decal)\b/i.test(t)) return 'sticker';
-  if(/\b(beer stein|shot glass|flask|wine)\b/i.test(t)) return 'barware';
+  if(/\b(beer stein|shot glass|flask|wine|barware)\b/i.test(t)) return 'barware';
   return 'design';
 }
 
 function detectAudience(t){
-  if(/\b(kid|child|baby|toddler|bunny)\b/i.test(t)) return 'Kids';
+  if(/\b(kid|child|baby|toddler)\b/i.test(t)) return 'Kids';
   if(/\b(women|woman|girl|her|mom|wife|bride|sister)\b/i.test(t)) return 'Women';
   if(/\b(men|man|boy|him|dad|husband|groom|brother)\b/i.test(t)) return 'Men';
-  if(/\b(nurse|teacher|doctor|chef)\b/i.test(t)) return t.match(/\b(nurse|teacher|doctor|chef)\b/i)[0];
+  if(/\b(nurse|teacher|doctor|chef)\b/i.test(t)) {
+    const match = t.match(/\b(nurse|teacher|doctor|chef)\b/i);
+    return match? match[0].charAt(0).toUpperCase() + match[0].slice(1) + 's' : null;
+  }
   return null;
 }
 
@@ -136,7 +139,8 @@ function getSynonym(word, index = 0) {
     'cute': ['adorable', 'kawaii', 'charming'],
     'colorful': ['vibrant', 'rainbow', 'bright'],
     'design': ['artwork', 'graphic', 'pattern'],
-    'watercolor': ['painted', 'artistic', 'aesthetic']
+    'watercolor': ['painted', 'artistic', 'aesthetic'],
+    'unique': ['special', 'original', 'distinct']
   };
   const base = word.toLowerCase();
   return synMap[base]?.[index] || word;
@@ -148,13 +152,16 @@ function buildTags(title) {
   const rawLower = raw.toLowerCase();
 
   // Extract components
-  const primary = cleanText(raw.split(/\s+/).slice(0,3).join(' ')) || 'Art Design'; // First 3 words as primary
+  const primaryRaw = cleanText(raw);
+  const primary = primaryRaw.split(/\s+/).slice(0,3).join(' ') || 'Art Design';
   const style = detectStyle(rawLower);
   const occasion = detectOccasion(rawLower);
   const audience = detectAudience(rawLower);
   const productType = detectProductType(rawLower);
   const category = detectCategory(productType);
   const isAlcohol = ALCOHOL_TRIGGERS.some(t => rawLower.includes(t));
+
+  console.log('[TagMaster] v3 Components:', {primary, style, occasion, audience, productType, category, isAlcohol});
 
   // Helper: cap at 5 words, scrub product types
   const formatTag = (str) => {
@@ -167,7 +174,7 @@ function buildTags(title) {
   const sanitizeKids = (tag) => {
     if (!isAlcohol) return tag;
     if (/\b(kids|children|toddler|baby|kindergarten|school)\b/i.test(tag)) {
-      return `${style} Design`;
+      return formatTag(`${style} Design`);
     }
     return tag;
   };
@@ -175,12 +182,11 @@ function buildTags(title) {
   let tags = [];
 
   // PHASE 1: SEO Foundation - Tags 1-3
-  tags[0] = formatTag(`${primary} ${style}`); // Tag 1
-  tags[1] = formatTag(`${primary} ${getSynonym(style, 0)}`); // Tag 2 - synonym
-  tags[2] = formatTag(`${getSynonym(primary.split(' ')[0], 0)} ${style} Design`); // Tag 3 - synonym primary
+  tags[0] = formatTag(`${primary} ${style}`);
+  tags[1] = formatTag(`${primary} ${getSynonym(style, 0)}`);
+  tags[2] = formatTag(`${getSynonym(primary.split(' ')[0], 0)} ${style} Design`);
 
   // PHASE 2: Intent & Persona - Tags 4-5 with Weighting
-  // Tag 4: Gift Intent - prioritize Occasion for Stationery
   if (category === 'Stationery/Cards' && occasion) {
     tags[3] = formatTag(`${occasion} Gift`);
   } else if (audience && ['Mom','Dad','Sister','Brother'].includes(audience)) {
@@ -191,7 +197,6 @@ function buildTags(title) {
     tags[3] = formatTag(`${style} Gift`);
   }
 
-  // Tag 5: Audience - prioritize for Apparel, apply Safety Lock
   let tag5 = '';
   if (category === 'Apparel/Shirts' && audience) {
     tag5 = `Gift for ${audience}`;
@@ -243,22 +248,30 @@ function buildTags(title) {
 
   // Final pass: Safety Lock, unique, exactly 10
   tags = tags.map(sanitizeKids).filter(t => t && t.length >= 2);
-  tags = [...new Set(tags)]; // Dedupe
+  tags = [...new Set(tags)];
 
   while (tags.length < 10) {
     tags.push(formatTag(`${style} ${primary.split(' ')[0]} Artwork`));
   }
 
+  console.log('[TagMaster] v3 Final Tags:', tags);
   return tags.slice(0, 10);
 }
 
-// ── SANITIZE FOR ZAZZLE ──────────────────────────────────────
+// ── SANITIZE FOR ZAZZLE V3 ───────────────────────────────────
 function sanitizeForZazzle(tags) {
   return tags
-  .map(t => t.toLowerCase().trim().replace(/[&#]/g, ''))
-  .filter(t => t.length >= 2 && t.length <= 20)
-  .filter((t, i, arr) => arr.indexOf(t) === i)
-  .slice(0, 10);
+ .map(t => t.toLowerCase()
+   .trim()
+   .replace(/[&#]/g, '') // Zazzle rejects & and #
+   .replace(/\s+/g, ' ') // Collapse spaces
+   )
+ .filter(t => {
+     const wordCount = t.split(' ').filter(w => w).length;
+     return t.length >= 3 && t.length <= 25 && wordCount >= 1 && wordCount <= 5;
+   })
+ .filter((t, i, arr) => arr.indexOf(t) === i)
+ .slice(0, 10);
 }
 
 // ── CALL API ─────────────────────────────────────────────────
@@ -289,6 +302,7 @@ async function generateAndApply() {
   try {
     data = await callAPI({ title });
   } catch {
+    console.log('[TagMaster] Using local v3 engine');
     data = { tags: buildTags(title) };
   }
 
@@ -296,6 +310,7 @@ async function generateAndApply() {
   if (!tags.length) tags = buildTags(title);
 
   tags = sanitizeForZazzle(tags);
+  console.log('[TagMaster] Sanitized tags:', tags);
 
   const filled = await fillTags(tags);
   if (!filled) {
@@ -304,23 +319,51 @@ async function generateAndApply() {
   }
 }
 
-// ── FILL TAGS INTO ZAZZLE ────────────────────────────────────
+// ── FILL TAGS INTO ZAZZLE - FIXED FOR PHRASES ────────────────
 async function fillTags(tags) {
   const input = findTagInput();
   const container = findTagContainer();
   if (!input ||!container) return false;
 
-  // Clear existing tags first
-  const existing = container.querySelectorAll('.TagInputList-tag');
-  existing.forEach(t => t.querySelector('[class*="remove"]')?.click());
+  console.log('[TagMaster] Filling tags:', tags);
 
+  // Clear existing tags
+  const existing = container.querySelectorAll('[class*="TagInputList-tag"]');
+  for (const t of existing) {
+    const removeBtn = t.querySelector('[class*="remove"], button, [aria-label*="remove" i]');
+    if (removeBtn) removeBtn.click();
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  await new Promise(r => setTimeout(r, 200));
+
+  // Add new tags one by one as complete phrases
   for (const tag of tags) {
+    if (!tag) continue;
+
+    input.focus();
     input.value = tag;
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    await new Promise(r => setTimeout(r, 100)); // Zazzle needs delay
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Zazzle needs Enter to commit the tag
+    input.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      bubbles: true
+    }));
+
+    await new Promise(r => setTimeout(r, 150)); // Critical: Zazzle React needs delay
   }
-  return true;
+
+  // Verify
+  await new Promise(r => setTimeout(r, 300));
+  const finalTags = [...container.querySelectorAll('[class*="TagInputList-tag"]')]
+  .map(t => t.textContent.replace(/[×✕]/g, '').trim());
+  console.log('[TagMaster] Zazzle accepted:', finalTags);
+
+  return finalTags.length > 0;
 }
 
 // ── SPY AND APPLY ────────────────────────────────────────────
@@ -337,16 +380,17 @@ async function spyAndApply(url) {
 }
 
 // ── PANEL + INIT ─────────────────────────────────
-function createPanel(container) {
+function createPanel() {
   if (document.getElementById('tm-panel')) return;
   const panel = document.createElement('div');
   panel.id = 'tm-panel';
-  panel.style.cssText = 'position:fixed;top:10px;right:10px;z-index:99999;background:#fff;padding:10px;border:2px solid #333;border-radius:8px;';
+  panel.style.cssText = 'position:fixed;top:10px;right:10px;z-index:99999;background:#fff;padding:12px;border:2px solid #0066cc;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.2);font-family:sans-serif;';
   panel.innerHTML = `
-    <button id="tm-gen-btn">Generate Tags v3</button>
-    <input id="tm-spy-input" placeholder="Competitor Zazzle URL" style="display:block;margin:5px 0;">
-    <button id="tm-spy-btn">Spy Tags</button>
-    <div id="tm-status" style="font-size:11px;margin-top:5px;"></div>
+    <div style="font-weight:bold;margin-bottom:8px;color:#0066cc;">TagMaster Pro v3.0</div>
+    <button id="tm-gen-btn" style="width:100%;padding:8px;margin-bottom:6px;cursor:pointer;">Generate Tags</button>
+    <input id="tm-spy-input" placeholder="Competitor Zazzle URL" style="width:200px;padding:6px;margin-bottom:6px;display:block;">
+    <button id="tm-spy-btn" style="width:100%;padding:8px;cursor:pointer;">Spy Tags</button>
+    <div id="tm-status" style="font-size:11px;margin-top:8px;color:#666;min-height:16px;"></div>
   `;
   document.body.appendChild(panel);
 
@@ -355,30 +399,30 @@ function createPanel(container) {
   const spyInput=document.getElementById('tm-spy-input');
   const status=document.getElementById('tm-status');
 
-  function show(msg){status.textContent=msg;}
+  function show(msg,color='#666'){status.textContent=msg;status.style.color=color;}
 
   genBtn.onclick = async () => {
-    show('Generating...');
+    show('Generating...','#0066cc');
     try {
       await generateAndApply();
-      show('✓ Tags applied!');
-    } catch(e) { show('Error: ' + e.message); }
+      show('✓ Tags applied!','#00aa00');
+    } catch(e) { show('Error: ' + e.message,'#cc0000'); }
   };
 
   spyBtn.onclick = async () => {
     const url = spyInput.value.trim();
-    if (!url) return show('Paste URL first');
-    show('Spying...');
+    if (!url) return show('Paste URL first','#cc6600');
+    show('Spying...','#0066cc');
     try {
       await spyAndApply(url);
-      show('✓ Competitor tags applied!');
-    } catch(e) { show('Error: ' + e.message); }
+      show('✓ Competitor tags applied!','#00aa00');
+    } catch(e) { show('Error: ' + e.message,'#cc0000'); }
   };
 }
 
 // Init
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => createPanel());
+  document.addEventListener('DOMContentLoaded', createPanel);
 } else {
   createPanel();
 }
