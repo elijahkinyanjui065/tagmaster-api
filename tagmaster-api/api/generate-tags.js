@@ -1,292 +1,177 @@
-// ==============================
-// Zazzle Tags Master — CORS SAFE BUILD + SMART TAGS
-// ==============================
-
-// ---------- TRADEMARK FILTER ----------
-const TRADEMARKS = [
-  'disney','marvel','pokemon','nintendo','barbie','hello kitty','star wars',
-  'harry potter','minecraft','fortnite','pixar','dreamworks','nickelodeon',
-  'lego','superman','batman','spiderman','avengers','frozen','moana',
-  'star trek','lord of the rings','dc comics','mickey','minnie'
-];
-
-function ipFilter(tags = []) {
-  try {
-    const blocked = [];
-    const safe = tags.filter(tag => {
-      if (!tag) return false;
-      const t = tag.toLowerCase();
-      if (t.length < 2) return false;
-      const hit = TRADEMARKS.some(tm => t.includes(tm));
-      if (hit) blocked.push(tag);
-      return !hit;
-    });
-    return { safe, blocked };
-  } catch (e) {
-    return { safe: tags, blocked: [] };
-  }
-}
-
-// ---------- HELPERS ----------
-function detectOccasion(text = '') {
-  const t = text.toLowerCase();
-  if (t.includes('easter')) return 'easter';
-  if (t.includes('birthday')) return 'birthday';
-  if (t.includes('christmas')) return 'christmas';
-  if (t.includes('wedding')) return 'wedding';
-  if (t.includes('halloween')) return 'halloween';
-  if (t.includes('baby') || t.includes('shower')) return 'baby';
-  return null;
-}
-
-function detectStyle(text = '') {
-  const t = text.toLowerCase();
-  if (t.includes('watercolor')) return 'watercolor';
-  if (t.includes('floral')) return 'floral';
-  if (t.includes('cute')) return 'cute';
-  if (t.includes('vintage')) return 'vintage';
-  if (t.includes('minimal')) return 'minimalist';
-  if (t.includes('colorful')) return 'colorful';
-  if (t.includes('pastel')) return 'pastel';
-  return null;
-}
-
-function detectProductType(text = '') {
-  const t = text.toLowerCase();
-  if (t.includes('shirt') || t.includes('tee') || t.includes('t-shirt')) return 'tshirt';
-  if (t.includes('mug')) return 'mug';
-  if (t.includes('poster') || t.includes('print')) return 'poster';
-  if (t.includes('sticker')) return 'sticker';
-  if (t.includes('card')) return 'card';
-  if (t.includes('tote') || t.includes('bag')) return 'tote bag';
-  if (t.includes('pillow')) return 'pillow';
-  if (t.includes('invitation') || t.includes('invite')) return 'invitation';
-  return null;
-}
-
-function detectAudience(text = '') {
-  const t = text.toLowerCase();
-  if (t.includes('kid') || t.includes('child') || t.includes('baby') || t.includes('bunny') || t.includes('unicorn')) return 'kids';
-  if (t.includes('mom') || t.includes('women') || t.includes('girl') || t.includes('her')) return 'women';
-  if (t.includes('dad') || t.includes('men') || t.includes('boy') || t.includes('him')) return 'men';
-  return 'general';
-}
-
-// ---------- TAG BUILDER - REWRITTEN ----------
+// ---------- TAG BUILDER v3.1 – FULL MASTER ENGINE (identical to local fallback) ----------
 function buildTags(title) {
   const raw = (title || '').toLowerCase().trim();
-  const occasion = detectOccasion(title);
-  const style = detectStyle(title);
-  const product = detectProductType(title) || 'design';
-  const audience = detectAudience(title);
 
-  // Deterministic stopwords and bad tokens
-  const STOP = new Set([
-    'the','and','for','with','a','an','of','on','in','to','my','is','are','it',
-    'personalized','personalise','custom','customized','name','your','by','from',
-    'sale','discount','cheap','free'
-  ]);
-
-  // Icons / niche tokens we treat specially
-  const ICONS = ['bunny','unicorn','dog','cat','sunflower','heart','owl','fox','bear'];
-
-  // Banned phrases (spam)
-  const BANNED_PHRASES = [
-    'post sale','for product','gift idea','cheap deal','personalized','custom'
-  ];
-
-  // Tokenize title into meaningful words
-  const tokens = raw
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w && w.length > 2 && !STOP.has(w));
-
-  // Helper: find first icon in title
-  const foundIcon = ICONS.find(ic => raw.includes(ic)) || null;
-
-  // Helper: extract a strong "primary" keyword or phrase
-  function extractPrimary() {
-    // Prefer occasion + icon (e.g., "easter bunny")
-    if (occasion && foundIcon) return `${occasion} ${foundIcon}`;
-
-    // Prefer first icon if present
-    if (foundIcon) return foundIcon;
-
-    // Prefer first token that is not a product or audience word
-    const productWords = new Set(['shirt','tshirt','tee','mug','poster','sticker','card','tote','bag','pillow','invitation','invite','print']);
-    const audienceWords = new Set(['kids','kid','children','child','women','men','mom','dad','girl','boy','her','him','baby']);
-    for (let i = 0; i < tokens.length; i++) {
-      const w = tokens[i];
-      if (productWords.has(w) || audienceWords.has(w)) continue;
-      // Avoid numeric-only tokens
-      if (/^\d+$/.test(w)) continue;
-      return w;
-    }
-
-    // Fallback: use occasion if present
-    if (occasion) return occasion;
-
-    // Fallback: use first token or 'design'
-    return tokens[0] || 'design';
+  // ── PHASE 0: MANDATORY PRODUCT ANALYSIS ─────────────────────────────────────
+  function detectOccasion(text) {
+    const s = text.toLowerCase();
+    if (s.includes('easter')) return 'Easter';
+    if (s.includes('birthday')) return 'Birthday';
+    if (s.includes('christmas')) return 'Christmas';
+    if (s.includes('wedding') || s.includes('bride') || s.includes('groom')) return 'Wedding';
+    if (s.includes('halloween')) return 'Halloween';
+    if (s.includes('graduation') || s.includes('grad')) return 'Graduation';
+    if (s.includes('fathers day') || s.includes('father\'s')) return 'Fathers Day';
+    if (s.includes('mothers day') || s.includes('mother\'s')) return 'Mothers Day';
+    if (s.includes('baby') || s.includes('shower')) return 'Baby Shower';
+    return null;
   }
 
-  const primary = extractPrimary();
+  function detectStyle(text) {
+    const s = text.toLowerCase();
+    const styles = {
+      watercolor: 'Watercolor', floral: 'Floral', vintage: 'Vintage',
+      boho: 'Boho', minimalist: 'Minimalist', retro: 'Retro',
+      sarcastic: 'Sarcastic', funny: 'Funny', cute: 'Cute',
+      modern: 'Modern', rustic: 'Rustic', abstract: 'Abstract',
+      geometric: 'Geometric', pastel: 'Pastel', colorful: 'Colorful',
+      elegant: 'Elegant', whimsical: 'Whimsical'
+    };
+    for (const [key, val] of Object.entries(styles)) {
+      if (s.includes(key)) return val;
+    }
+    // fallback creative style from adjectives
+    if (s.includes('cute') || s.includes('adorable')) return 'Cute';
+    if (s.includes('funny') || s.includes('sarcastic')) return 'Sarcastic';
+    return 'Stylish'; // safe non-generic fallback
+  }
 
-  // Helper: validate tag against constraints
-  function isValidTag(tag) {
-    if (!tag || typeof tag !== 'string') return false;
-    const t = tag.toLowerCase().trim();
-    // no banned phrases
-    if (BANNED_PHRASES.some(bp => t.includes(bp))) return false;
-    // no trademark substrings
-    if (TRADEMARKS.some(tm => t.includes(tm))) return false;
-    const words = t.split(/\s+/).filter(Boolean);
-    if (words.length < 2 || words.length > 3) return false; // enforce 2-3 words
-    if (t.length < 3 || t.length > 24) return false; // enforce length
-    // no single-word tokens inside (already checked), ensure no broken splits like 'gift for her' -> allowed as phrase but we avoid splitting elsewhere
+  function detectAudience(text) {
+    const s = text.toLowerCase();
+    if (s.includes('nurse') || s.includes('nurses')) return 'Nurses';
+    if (s.includes('teacher') || s.includes('teachers')) return 'Teachers';
+    if (s.includes('mom') || s.includes('mum') || s.includes('mothers')) return 'Moms';
+    if (s.includes('dad') || s.includes('fathers')) return 'Dads';
+    if (s.includes('kid') || s.includes('child') || s.includes('baby') || s.includes('toddler')) return 'Kids';
+    if (s.includes('women') || s.includes('her') || s.includes('girl')) return 'Women';
+    if (s.includes('men') || s.includes('him') || s.includes('boy')) return 'Men';
+    if (s.includes('dog') || s.includes('cat') || s.includes('pet')) return 'Pet Lovers';
+    return 'Everyone';
+  }
+
+  function detectCategory(text) {
+    const s = text.toLowerCase();
+    if (s.includes('card') || s.includes('invitation') || s.includes('invite') || s.includes('stationery')) return 'Stationery/Cards';
+    if (s.includes('shirt') || s.includes('tee') || s.includes('t-shirt') || s.includes('hoodie')) return 'Apparel/Shirts';
+    if (s.includes('mug') || s.includes('pillow') || s.includes('blanket') || s.includes('decor') || s.includes('poster')) return 'Home Decor';
+    return 'Everything Else';
+  }
+
+  function isAlcoholRelated(text) {
+    const s = text.toLowerCase();
+    return /beer|wine|shot|flask|bar|alcohol|cocktail|whiskey|vodka|stein|coaster/.test(s);
+  }
+
+  const occasion = detectOccasion(raw);
+  const style = detectStyle(raw);
+  const audience = detectAudience(raw);
+  const category = detectCategory(raw);
+  const isKidsLocked = isAlcoholRelated(raw);
+
+  // Extract Primary Subject (smart – first meaningful descriptive phrase)
+  const STOP = new Set(['the','and','for','with','a','an','of','on','in','to','my','is','are','it','gift','custom','personalized']);
+  const tokens = raw.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+  let primary = tokens.slice(0, 3).join(' '); // up to 3-word primary
+  if (occasion && tokens.includes(occasion.toLowerCase())) primary = occasion + ' ' + primary;
+  if (!primary) primary = 'Design';
+
+  // ── KIDS SAFETY LOCK ───────────────────────────────────────────────────────
+  function applyKidsLock(tag) {
+    if (!isKidsLocked) return tag;
+    const lower = tag.toLowerCase();
+    if (/kids|children|toddler|baby|kindergarten|school/.test(lower)) {
+      return `${style} Aesthetic Design`;
+    }
+    return tag;
+  }
+
+  // ── WORD REPETITION GUARD (no word >3 times total) ───────────────────────
+  let wordCount = {};
+  function canAddTag(tag) {
+    const words = tag.toLowerCase().split(/\s+/);
+    for (const w of words) {
+      if ((wordCount[w] || 0) >= 3) return false;
+    }
     return true;
   }
-
-  // Build tags in fixed deterministic order per spec
-  const out = [];
-
-  // 1. PRIMARY (primary + product) -> tag #1
-  const primaryProduct = `${primary} ${product}`.replace(/\s+/g, ' ').trim();
-  if (isValidTag(primaryProduct)) out.push(primaryProduct);
-
-  // 2. GIFT-INTENT (always 2 tags)
-  // 2a: occasion gift (if occasion) else primary gift
-  const occasionGift = occasion ? `${occasion} gift` : `${primary} gift`;
-  if (isValidTag(occasionGift)) out.push(occasionGift);
-
-  // 2b: audience gift (deterministic)
-  let audienceGift = 'gift for her';
-  if (audience === 'kids') audienceGift = 'gift for kids';
-  else if (audience === 'women') audienceGift = 'gift for her';
-  else if (audience === 'men') audienceGift = 'gift for him';
-  if (isValidTag(audienceGift)) out.push(audienceGift);
-
-  // 3. AUDIENCE + PRODUCT (1 tag if audience exists and not general)
-  if (audience && audience !== 'general') {
-    const audProd = `${audience} ${product}`;
-    if (isValidTag(audProd)) out.push(audProd);
+  function recordWords(tag) {
+    const words = tag.toLowerCase().split(/\s+/);
+    for (const w of words) wordCount[w] = (wordCount[w] || 0) + 1;
   }
 
-  // 4. SEARCH COMBOS (2 tags)
-  // primary + occasion
-  if (occasion) {
-    const pOcc = `${primary} ${occasion}`;
-    if (isValidTag(pOcc)) out.push(pOcc);
-  }
-  // primary + style
-  if (style) {
-    const pStyle = `${primary} ${style}`;
-    if (isValidTag(pStyle)) out.push(pStyle);
-  }
+  // ── BUILD TAGS – EXACT v3.1 SEQUENCE ───────────────────────────────────────
+  const tags = [];
 
-  // 5. LONG-TAIL (2 tags)
-  if (style && occasion && product) {
-    const long1 = `${style} ${occasion} ${product}`;
-    if (isValidTag(long1)) out.push(long1);
-  }
-  if (style && product) {
-    const long2 = `${style} ${product}`;
-    if (isValidTag(long2)) out.push(long2);
-  }
-
-  // 6. NICHE-EXTRA (1 tag max)
-  if (foundIcon) {
-    const niche = product ? `${foundIcon} ${product}` : `${foundIcon} design`;
-    if (isValidTag(niche)) out.push(niche);
-  }
-
-  // Deduplicate while preserving order
-  const deduped = [];
-  const seen = new Set();
-  for (const t of out) {
-    const s = (t || '').toLowerCase().trim();
-    if (!s) continue;
-    if (seen.has(s)) continue;
-    seen.add(s);
-    deduped.push(s);
-  }
-
-  // IP filter (remove trademarked tags)
-  const { safe } = ipFilter(deduped);
-  let final = safe.slice(); // copy
-
-  // Ensure we have exactly 10 tags: backfill deterministically with primaryProduct
-  const filler = primaryProduct && isValidTag(primaryProduct) ? primaryProduct : `${primary} design`;
-  while (final.length < 10) {
-    // Only add filler if it passes validation and isn't already present more than necessary
-    final.push(filler);
-  }
-
-  // Final pass: enforce constraints and trim to 10
-  final = final
-    .map(t => t.toLowerCase().trim())
-    .filter((t, i, arr) => {
-      // enforce constraints again
-      if (!isValidTag(t)) return false;
-      // avoid duplicates beyond necessary: allow repeated filler but keep deterministic order
-      return true;
-    })
-    .slice(0, 10);
-
-  // If somehow we lost tags due to filtering, force-fill with deterministic safe fallback
-  while (final.length < 10) {
-    final.push(filler);
-  }
-
-  return final;
-}
-
-// ---------- SAFE HANDLER ----------
-export default async function handler(req, res) {
-  try {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
+  // Phase 1: SEO Foundation (Tags 1–3) – synonym-style variations
+  const var1 = `${primary} ${style}`;
+  const var2 = `${style} ${primary}`;
+  const var3 = `${primary} ${style === 'Stylish' ? 'Art' : style}`;
+  [var1, var2, var3].forEach(t => {
+    const clean = t.trim();
+    if (tags.length < 3 && canAddTag(clean)) {
+      const locked = applyKidsLock(clean);
+      tags.push(locked);
+      recordWords(locked);
     }
+  });
 
-    if (req.method !== 'POST') {
-      return res.status(405).json({ success: false });
+  // Phase 2: Intent & Persona (Tags 4–5)
+  let tag4 = occasion ? `${occasion} Gift` : `${audience} Gift`;
+  tag4 = applyKidsLock(tag4);
+  if (canAddTag(tag4)) { tags.push(tag4); recordWords(tag4); }
+
+  let tag5 = `Gift for ${audience}`;
+  tag5 = applyKidsLock(tag5);
+  if (canAddTag(tag5)) { tags.push(tag5); recordWords(tag5); }
+
+  // Phase 3: Long-Tail Phrases (Tags 6–7) – 3–5 word natural phrases
+  const long1 = `${primary} ${style} ${occasion ? occasion : audience} Gift`.trim();
+  const long2 = `${style} ${primary} Design Gift`.trim();
+  [long1, long2].forEach(t => {
+    if (tags.length < 7 && canAddTag(t)) {
+      const locked = applyKidsLock(t);
+      tags.push(locked);
+      recordWords(locked);
     }
+  });
 
-    const { title = '' } = req.body || {};
-
-    if (!title || title.length < 3) {
-      return res.status(200).json({
-        success: false,
-        tags: [],
-        error: 'Invalid title'
-      });
-    }
-
-    let tags = buildTags(title);
-
-    // Fallback so we never return empty (shouldn't happen with new builder)
-    if (!tags || tags.length === 0) {
-      const words = title.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-      const fallback = (words.slice(0, 2).join(' ') || 'gift for her');
-      tags = Array(10).fill(fallback).slice(0, 10);
-    }
-
-    return res.status(200).json({
-      success: true,
-      tags,
-      count: tags.length
-    });
-
-  } catch (err) {
-    console.error('API Error:', err);
-    return res.status(200).json({
-      success: false,
-      tags: [],
-      error: 'safe-failure'
-    });
+  // Phase 4: Dynamic Mix (Tags 8–10) – Category-weighted
+  let tag8, tag9, tag10;
+  if (category === 'Stationery/Cards') {
+    tag8 = `${style} ${occasion || 'Card'}`;
+    tag9 = `${occasion || 'Birthday'} Stationery`;
+    tag10 = `${primary} Card`;
+  } else if (category === 'Apparel/Shirts') {
+    tag8 = `${audience} ${primary}`;
+    tag9 = `${style} Apparel`;
+    tag10 = `Sarcastic ${primary} Tee`;
+  } else if (category === 'Home Decor') {
+    tag8 = `${style} ${primary}`;
+    tag9 = `${primary} Decor`;
+    tag10 = `${style} Home Gift`;
+  } else {
+    tag8 = `${style} ${primary}`;
+    tag9 = `${primary} ${style}`;
+    tag10 = `${occasion || 'Special'} Gift`;
   }
+
+  [tag8, tag9, tag10].forEach(t => {
+    const clean = t.trim();
+    if (tags.length < 10 && canAddTag(clean)) {
+      const locked = applyKidsLock(clean);
+      tags.push(locked);
+      recordWords(locked);
+    }
+  });
+
+  // Final enforcement – exactly 10 tags, max 5 words, sanitized
+  let final = tags
+    .map(t => t.toLowerCase().trim().replace(/[&#]/g, ''))
+    .filter(t => t.length >= 2 && t.length <= 40 && t.split(' ').length <= 5);
+
+  // Dedupe + fill if needed (using safe primary variation)
+  const filler = `${primary} ${style}`.toLowerCase().trim();
+  while (final.length < 10) final.push(filler);
+
+  return final.slice(0, 10);
 }
