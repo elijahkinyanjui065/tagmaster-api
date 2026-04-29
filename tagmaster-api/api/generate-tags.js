@@ -7,7 +7,14 @@ export default async function handler(req, res) {
   if (req.method!== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
   try {
-    const { title = '' } = req.body;
+    const { title = '', spyUrl = '' } = req.body;
+
+    // Handle spy requests
+    if (spyUrl) {
+      // Add your spy logic here if needed, or return empty
+      return res.status(200).json({ success: true, tags: [], spyTags: [] });
+    }
+
     const clean = title.trim();
     if (!clean || clean.length < 3) {
       return res.status(400).json({ success: false, error: 'Input product title first' });
@@ -51,7 +58,7 @@ function generateSecretSauceTags(title) {
     return tag;
   }
 
-  // TAGS 1-3: SEO Foundation
+  // TAGS 1-3: SEO Foundation — natural phrases, no hyphens
   const seo1 = primary;
   const seo2 = style? `${primary} ${style}` : `${primary} gift`;
   const seo3 = occasion? `${primary} ${occasion}` : `unique ${primary}`;
@@ -63,7 +70,7 @@ function generateSecretSauceTags(title) {
     }
   });
 
-  // TAGS 4-5: Intent Tags
+  // TAGS 4-5: Intent Tags — buyer focused
   let tag4 = occasion? `${occasion} gift` : `${primary} gift`;
   tag4 = applyKidsLock(tag4);
   tags.push(tag4);
@@ -79,7 +86,7 @@ function generateSecretSauceTags(title) {
   tags.push(tag5);
   recordWords(tag5);
 
-  // TAGS 6-7: Long-Tail
+  // TAGS 6-7: Long-Tail search phrases
   const long1 = style && occasion? `${style} ${primary} ${occasion}` : `${primary} ${style} design`;
   const long2 = occasion? `${occasion} ${style} gift` : `${primary} ${style} art`;
   [long1, long2].forEach(t => {
@@ -89,7 +96,7 @@ function generateSecretSauceTags(title) {
     }
   });
 
-  // TAGS 8-10: Category Mix
+  // TAGS 8-10: Category Mix — natural phrases
   const category = detectCategory(raw);
   let tag8, tag9, tag10;
 
@@ -115,14 +122,19 @@ function generateSecretSauceTags(title) {
     if (tags.length < 10) tags.push(t);
   });
 
+  // FINAL: No hyphens, 2-4 words, clean
   let final = tags
-   .map(t => t.toLowerCase().trim().replace(/[&#]/g, ''))
-   .filter(t => t.split(' ').length >= 2 && t.split(' ').length <= 5)
-   .filter((t, i, arr) => arr.indexOf(t) === i)
-   .slice(0, 10);
+.map(t => t.toLowerCase().trim().replace(/[&#]/g, '')) // Keep spaces, no hyphen replacement
+.filter(t => {
+      const wordCount = t.split(' ').length;
+      return wordCount >= 2 && wordCount <= 4 && t.length <= 40;
+    })
+.filter((t, i, arr) => arr.indexOf(t) === i)
+.slice(0, 10);
 
   const { safe, blocked } = ipFilter(final);
 
+  // Guarantee 10 tags — natural 2-word fillers
   while (safe.length < 10) {
     safe.push(`${primary} ${style}`.toLowerCase());
   }
