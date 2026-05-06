@@ -1,4 +1,4 @@
-/* /api/generate-tags.js — THE SALES ENGINE BLUEPRINT */
+/* /api/generate-tags.js — SEARCH QUERY SIMULATOR v3.2 */
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -9,24 +9,32 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
   try {
-    const { title = '' } = req.body;
+    const { title = '', product } = req.body;
     const cleanTitle = (title || '').trim();
 
     if (!cleanTitle || cleanTitle.length < 3) {
       return res.status(400).json({ success: false, error: 'Input product title first' });
     }
 
-    // BREAKDOWN SIGNALS (The Foundation)
-    const signals = interpretProductSignals(cleanTitle);
-    
-    // GENERATE HIERARCHY (The Sales Engine)
-    const { tags, blocked } = generateHierarchicalTags(signals, cleanTitle);
+    if (!product) {
+      return res.status(400).json({ success: false, error: 'Product type required - add to title (shirt, mug, card, etc.)' });
+    }
+
+    // LOCKED PRODUCT PIPELINE — NO RE-DETECTION
+    const signals = {
+      product: product.toLowerCase(),
+      occasion: detectOccasion(cleanTitle),
+      recipient: detectRecipient(cleanTitle),
+      isFunny: detectHumor(cleanTitle)
+    };
+
+    const tags = generateProductIsolatedTags(signals);
 
     res.status(200).json({
       success: true,
       tags,
-      blocked: blocked.length,
-      status: '100% SEO Optimized'
+      product_locked: signals.product,
+      status: 'search-optimized'
     });
 
   } catch (e) {
@@ -35,127 +43,188 @@ export default async function handler(req, res) {
   }
 }
 
-/* ── SIGNAL INTERPRETATION ────────────────────────────────────────────────── */
+/* ── SIGNAL DETECTION ───────────────────────────────────── */
 
-function interpretProductSignals(title) {
-  const t = title.toLowerCase();
-  return {
-    occasion: detectOccasion(t) || "special-occasion",
-    type: detectType(t) || "custom-gift",
-    style: detectStyle(t) || "modern-design",
-    visual: detectVisual(t) || "unique-aesthetic",
-    audience: detectAudience(t)
-  };
+function detectOccasion(t) {
+  const s = t.toLowerCase();
+  if (s.includes('christmas') || s.includes('xmas') || s.includes('holiday')) return 'christmas';
+  if (s.includes('birthday') || s.includes('bday')) return 'birthday';
+  if (s.includes('wedding') || s.includes('bride') || s.includes('groom')) return 'wedding';
+  if (s.includes('baby') || s.includes('shower') || s.includes('newborn')) return 'baby shower';
+  if (s.includes('valentine') || s.includes('valentines')) return 'valentine';
+  if (s.includes('thanksgiving')) return 'thanksgiving';
+  if (s.includes('easter')) return 'easter';
+  if (s.includes('halloween')) return 'halloween';
+  if (s.includes('mothers') || s.includes('mothers day')) return 'mothers day';
+  if (s.includes('fathers') || s.includes('fathers day')) return 'fathers day';
+  if (s.includes('graduation') || s.includes('grad')) return 'graduation';
+  return 'gift';
 }
 
-/* ── THE 10-TAG HIERARCHY ────────────────────────────────────────────────── */
+function detectRecipient(t) {
+  const s = t.toLowerCase();
+  if (s.includes('mom') || s.includes('mother') || s.includes('mum')) return 'mom';
+  if (s.includes('dad') || s.includes('father')) return 'dad';
+  if (s.includes('grandma') || s.includes('grandmother')) return 'grandma';
+  if (s.includes('grandpa') || s.includes('grandfather')) return 'grandpa';
+  if (s.includes('teacher')) return 'teacher';
+  if (s.includes('friend')) return 'friend';
+  if (s.includes('sister')) return 'sister';
+  if (s.includes('brother')) return 'brother';
+  if (s.includes('wife')) return 'wife';
+  if (s.includes('husband')) return 'husband';
+  if (s.includes('couple')) return 'couple';
+  if (s.includes('family')) return 'family';
+  return 'family';
+}
 
-function generateHierarchicalTags(s, title) {
-  const tags = [];
-  const used = new Set();
+function detectHumor(t) {
+  return /\bfunny\b|\bhumor\b|\bjoke\b|\bmeme\b|\bsarcastic\b|\bpun\b|\bdad joke\b/.test(t.toLowerCase());
+}
 
-  function addTag(tag) {
+/* ── PRODUCT-ISOLATED SEARCH SIMULATOR ─────────────────── */
+
+function generateProductIsolatedTags(signals) {
+  const { product, occasion, recipient, isFunny } = signals;
+  const tags = new Set();
+
+  const add = (tag) => {
     if (!tag) return;
-    const formatted = tag.toLowerCase().trim();
-    const words = formatted.split(/\s+/).filter(Boolean);
-    // STRICTOR RULES: No 1-word, no duplicates, max 10
-    if (words.length >= 2 && !used.has(formatted) && tags.length < 10) {
-      tags.push(formatted);
-      used.add(formatted);
+    const clean = tag.toLowerCase().trim().replace(/\s+/g, ' ');
+    const words = clean.split(' ').filter(Boolean);
+    
+    // ENFORCE 2-5 WORDS
+    if (words.length < 2 || words.length > 5) return;
+    
+    // BLOCK MARKETING SPAM
+    const BANNED = [
+      'personalized', 'personalised', 'customized',
+      'design', 'designs', 'designer',
+      'gift idea', 'gift ideas',
+      'creative', 'creativity',
+      'artwork', 'art', 'artistic',
+      'aesthetic', 'aesthetics',
+      'modern', 'contemporary',
+      'elegant', 'stylish', 'trendy',
+      'handmade', 'handcrafted',
+      'unique', 'special',
+      'perfect', 'best',
+      'themed', 'theme',
+      'style', 'styling',
+      'hand drawn', 'digital',
+      'vintage', 'retro', 'classic',
+      'minimalist', 'simple',
+      'colorful', 'color palette',
+      'pattern', 'print'
+    ];
+    
+    if (BANNED.some(b => clean.includes(b))) return;
+    
+    // MUST CONTAIN PRODUCT
+    if (!clean.includes(product)) return;
+    
+    tags.add(clean);
+  };
+
+  // CORE SEARCH PATTERNS (PRODUCT-LOCKED)
+  add(`${occasion} ${product} for ${recipient}`);
+  add(`${occasion} ${product}`);
+  add(`${product} for ${recipient}`);
+  add(`${occasion} ${product} gift`);
+  add(`${product} gift for ${recipient}`);
+  add(`${occasion} ${product} for family`);
+  add(`${product} for family`);
+  
+  // RECIPIENT VARIANTS
+  if (recipient !== 'mom') add(`${occasion} ${product} for mom`);
+  if (recipient !== 'dad') add(`${occasion} ${product} for dad`);
+  if (recipient !== 'teacher') add(`${occasion} ${product} for teacher`);
+  
+  // OCCASION VARIANTS
+  if (occasion !== 'christmas') add(`christmas ${product} for ${recipient}`);
+  if (occasion !== 'birthday') add(`birthday ${product} for ${recipient}`);
+  
+  // HUMOR (ONLY IF DETECTED)
+  if (isFunny) {
+    add(`funny ${product} for ${recipient}`);
+    add(`funny ${occasion} ${product}`);
+  }
+
+  // PRODUCT-SPECIFIC PATTERNS
+  switch(product) {
+    case 'shirt':
+    case 't-shirt':
+    case 'tee':
+      add(`${occasion} graphic tee`);
+      add(`${product} for ${recipient}`);
+      break;
+    case 'mug':
+      add(`${occasion} coffee mug`);
+      add(`coffee mug for ${recipient}`);
+      break;
+    case 'card':
+    case 'greeting card':
+    case 'invitation':
+      add(`${occasion} greeting card`);
+      add(`${occasion} thank you card`);
+      add(`thank you card for ${recipient}`);
+      break;
+    case 'ornament':
+      add(`${occasion} ornament`);
+      add(`christmas tree ornament`);
+      break;
+    case 'pillow':
+      add(`${occasion} throw pillow`);
+      add(`decorative pillow for ${recipient}`);
+      break;
+    case 'poster':
+    case 'print':
+      add(`${occasion} wall art`);
+      add(`${occasion} art print`);
+      break;
+    case 'sticker':
+      add(`${occasion} vinyl sticker`);
+      add(`${product} for ${recipient}`);
+      break;
+    case 'tote':
+    case 'tote bag':
+      add(`${occasion} tote bag`);
+      add(`canvas tote for ${recipient}`);
+      break;
+    case 'phone case':
+    case 'phonecase':
+      add(`${occasion} phone case`);
+      add(`iphone case for ${recipient}`);
+      break;
+    case 'blanket':
+      add(`${occasion} throw blanket`);
+      add(`cozy blanket for ${recipient}`);
+      break;
+    case 'hoodie':
+      add(`${occasion} hoodie`);
+      add(`${product} for ${recipient}`);
+      break;
+  }
+
+  // CONVERT TO ARRAY AND LIMIT TO 10
+  const result = Array.from(tags).slice(0, 10);
+
+  // EMERGENCY FILL (IF LESS THAN 10)
+  while (result.length < 10) {
+    const fallbacks = [
+      `${occasion} ${product}`,
+      `${product} for ${recipient}`,
+      `${occasion} ${product} gift`,
+      `${product} ${occasion}`,
+      `best ${product} for ${occasion}`
+    ];
+    const next = fallbacks[result.length % fallbacks.length];
+    if (!result.includes(next) && next.split(' ').length >= 2) {
+      result.push(next);
+    } else {
+      break;
     }
   }
 
-  // 1-3: CORE 3-WORD PHRASES (Ranking Weight)
-  addTag(`${s.style} ${s.occasion} ${s.type}`);
-  addTag(`${s.visual} ${s.style} ${s.type}`);
-  addTag(`${s.occasion} ${s.type} design`);
-
-  // 4-5: BUYER INTENT (Conversion Drivers)
-  const intentMap = {
-    wedding: ['gift for bride', 'wedding party favor'],
-    baby: ['new baby gift', 'baby shower present'],
-    christmas: ['holiday gift idea', 'christmas stocking stuffer'],
-    birthday: ['birthday party gift', 'personalized birthday present'],
-    'special-occasion': ['unique gift idea', 'personalized keepsake']
-  };
-  const intents = intentMap[s.occasion] || intentMap['special-occasion'];
-  addTag(intents[0]);
-  addTag(intents[1]);
-
-  // 6-7: OCCASION & CONTEXT (Broad Reach)
-  addTag(`${s.occasion} ${s.type}`);
-  addTag(`${s.audience} ${s.occasion} gift`);
-
-  // 8-9: STYLE & VISUAL DIVERSITY (Discovery)
-  addTag(`${s.style} artwork style`);
-  addTag(`${s.visual} themed design`);
-
-  // 10: SPECIFIC DETAIL ANCHOR (Theme/Color)
-  addTag(`${s.visual} color palette`);
-
-  // IP FILTER & EMERGENCY EXPANSION
-  let { safe, blocked } = ipFilter(tags);
-
-  // If we lack tags, intelligently expand into adjacent search spaces, NOT fillers
-  const neighbors = [`${s.style} aesthetic`, `${s.occasion} celebration`, `custom ${s.type} art`];
-  let i = 0;
-  while (safe.length < 10 && i < neighbors.length) {
-    addTag(neighbors[i]);
-    i++;
-    ({ safe, blocked } = ipFilter(tags));
-  }
-
-  return { tags: safe, blocked };
-}
-
-/* ── REFINED DETECTORS ────────────────────────────────────────────────────── */
-
-function detectType(t) {
-  if (t.includes('invitation') || t.includes('card')) return 'invitation';
-  if (t.includes('shirt') || t.includes('tee')) return 'apparel shirt';
-  if (t.includes('mug')) return 'coffee mug';
-  if (t.includes('pillow')) return 'throw pillow';
-  return null;
-}
-
-function detectOccasion(t) {
-  if (t.includes('wedding')) return 'wedding';
-  if (t.includes('baby') || t.includes('shower')) return 'baby shower';
-  if (t.includes('christmas') || t.includes('holiday')) return 'christmas';
-  if (t.includes('birthday')) return 'birthday';
-  return null;
-}
-
-function detectStyle(t) {
-  if (t.includes('floral') || t.includes('botanical')) return 'floral';
-  if (t.includes('minimalist') || t.includes('simple')) return 'minimalist';
-  if (t.includes('vintage') || t.includes('retro')) return 'vintage';
-  if (t.includes('watercolor')) return 'watercolor';
-  return 'artistic';
-}
-
-function detectVisual(t) {
-  const colors = ['rose', 'pink', 'blue', 'gold', 'green', 'black'];
-  const foundColor = colors.find(c => t.includes(c));
-  if (foundColor) return foundColor;
-  if (t.includes('nature')) return 'nature inspired';
-  if (t.includes('modern')) return 'modern sleek';
-  return 'handcrafted';
-}
-
-function detectAudience(t) {
-  if (t.includes('bride') || t.includes('her') || t.includes('mom')) return 'women';
-  if (t.includes('groom') || t.includes('him') || t.includes('dad')) return 'men';
-  return 'unisex';
-}
-
-function ipFilter(tags) {
-  const TRADEMARKS = ['disney','marvel','pokemon','nintendo','barbie'];
-  const blocked = [];
-  const safe = tags.filter(tag => {
-    const hit = TRADEMARKS.find(tm => tag.toLowerCase().includes(tm));
-    if (hit) blocked.push({ tag, reason: hit });
-    return !hit;
-  });
-  return { safe, blocked };
+  return result.slice(0, 10);
 }
