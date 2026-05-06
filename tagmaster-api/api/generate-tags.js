@@ -1,4 +1,4 @@
-/* TAGMASTER V6 — DETERMINISTIC + RANKED ENGINE */
+/* TAGMASTER V6.1 — DETERMINISTIC + NULL-SAFE */
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,149 +10,81 @@ export default async function handler(req, res) {
 
   try {
     const { title, product } = req.body;
+    if (!title || !product) return res.status(400).json({ error: 'Title + product required' });
 
-    if (!title || !product) {
-      return res.status(400).json({ error: 'Title + product required' });
-    }
-
-    const cleanTitle = title.toLowerCase();
+    const t = title.toLowerCase();
 
     const signals = {
       product: product.toLowerCase(),
-      occasion: detectOccasion(cleanTitle),
-      recipient: detectRecipient(cleanTitle),
-      isFunny: detectHumor(cleanTitle)
+      occasion: detectOccasion(t),      // null if not found
+      recipient: detectRecipient(t),    // null if not found
+      isFunny: detectHumor(t)
     };
 
-    const rawTags = generateBaseTags(signals);
-    const finalTags = refineAndRankTags(rawTags, signals);
-
-    return res.status(200).json({
-      success: true,
-      tags: finalTags
-    });
+    const tags = generateStructuredTags(signals);
+    return res.status(200).json({ success: true, tags });
 
   } catch (e) {
     return res.status(500).json({ error: 'Engine failure' });
   }
 }
 
-/* ─────────────────────────────
-   SIGNAL DETECTION
-───────────────────────────── */
-
 function detectOccasion(t) {
-  if (t.includes('christmas') || t.includes('xmas') || t.includes('holiday')) return 'christmas';
-  if (t.includes('birthday')) return 'birthday';
-  if (t.includes('wedding')) return 'wedding';
-  return 'gift';
+  if (/christmas|xmas|holiday|santa/.test(t)) return 'christmas';
+  if (/birthday|bday/.test(t)) return 'birthday';
+  if (/wedding|bride|groom/.test(t)) return 'wedding';
+  if (/baby|shower|newborn/.test(t)) return 'baby';
+  if (/valentine|valentines/.test(t)) return 'valentine';
+  return null;
 }
 
 function detectRecipient(t) {
-  if (t.includes('mom')) return 'mom';
-  if (t.includes('dad')) return 'dad';
-  if (t.includes('family')) return 'family';
-  return 'family';
+  if (/\bmom\b|\bmother\b/.test(t)) return 'mom';
+  if (/\bdad\b|\bfather\b/.test(t)) return 'dad';
+  if (/\bfamily\b/.test(t)) return 'family';
+  if (/\bfriend\b/.test(t)) return 'friend';
+  if (/\bteacher\b/.test(t)) return 'teacher';
+  if (/\bcoworker\b|\bboss\b/.test(t)) return 'coworker';
+  return null;
 }
 
 function detectHumor(t) {
-  return /funny|joke|meme/.test(t);
+  return /funny|joke|meme|humor|pun/.test(t);
 }
 
-/* ─────────────────────────────
-   STAGE 1: GENERATION (WIDE POOL)
-───────────────────────────── */
+function generateStructuredTags({ product, occasion, recipient, isFunny }) {
+  if (!product) return [];
 
-function generateBaseTags({ product, occasion, recipient, isFunny }) {
-  const pool = new Set();
+  const o = occasion;
+  const r = recipient;
+  const p = product;
+  const used = new Set();
+  const out = [];
 
   const add = (tag) => {
-    if (!tag) return;
-    const clean = tag.toLowerCase().trim();
-    if (clean.split(' ').length < 2 || clean.split(' ').length > 5) return;
-    pool.add(clean);
+    if (!tag || tag.includes('null')) return;
+    const clean = tag.toLowerCase().trim().replace(/\s+/g, ' ');
+    const wc = clean.split(' ').length;
+    if (wc < 3 || wc > 5) return;
+    if (used.has(clean)) return;
+    // block marketing generics
+    if (/graphic tee|greeting card|thank you card|idea piece|artwork/.test(clean)) return;
+    used.add(clean);
+    out.push(clean);
   };
 
-  // CORE
-  add(`${occasion} ${product}`);
-  add(`${product} for ${recipient}`);
-  add(`${occasion} ${product} for ${recipient}`);
+  // 10-slot structure, null-safe
+  add(o && r ? `${o} ${p} for ${r}` : o ? `${o} ${p} gift idea` : null);
+  add(r && o ? `${r} ${o} ${p}` : o ? `${o} ${p} for family` : null);
+  add(o ? `${o} ${p} gift` : `${p} holiday gift`);
+  add(o && r ? `${o} gift for ${r}` : o ? `${o} gift idea` : null);
+  add(r ? `${p} gift for ${r}` : `${p} ${o || 'holiday'} gift`);
+  add(o ? `${o} ${p} for adults` : `${p} festive gift idea`);
+  add(r ? `${p} for ${r} gift` : `${p} holiday present`);
+  add(isFunny && o ? `funny ${o} ${p}` : o ? `${o} ${p} idea` : `funny ${p} gift`);
+  add(o ? `${o} ${p} design` : `${p} winter design`);
+  add(o ? `${o} ${p} theme` : `${p} holiday theme`);
 
-  // BUYER INTENT
-  add(`${product} gift for ${recipient}`);
-  add(`${occasion} ${product} gift`);
-
-  // USE CASE
-  add(`family ${occasion} ${product}`);
-  add(`holiday ${product} for ${recipient}`);
-
-  // FUNCTIONAL (PRODUCT LOCKED)
-  if (product === 'card') {
-    add(`christmas greeting card`);
-    add(`holiday thank you card`);
-  }
-
-  if (product === 'shirt') {
-    add(`christmas graphic tee`);
-    add(`holiday shirt outfit`);
-  }
-
-  // HUMOR
-  if (isFunny) {
-    add(`funny ${product} for ${recipient}`);
-  }
-
-  // LONG TAIL
-  add(`${recipient} holiday ${product}`);
-  add(`matching family ${product}`);
-
-  return Array.from(pool);
-}
-
-/* ─────────────────────────────
-   STAGE 2: REFINEMENT + RANKING
-───────────────────────────── */
-
-function refineAndRankTags(tags, signals) {
-  const { product, occasion, recipient } = signals;
-
-  const banned = new Set([
-    `${occasion} ${product}`,
-    `${product}`,
-    `graphic tee`,
-    `greeting card`,
-    `thank you card`
-  ]);
-
-  const score = (tag) => {
-    let s = 0;
-
-    if (tag.includes(product)) s += 5;
-    if (tag.includes(occasion)) s += 4;
-    if (recipient && tag.includes(recipient)) s += 4;
-
-    if (tag.split(' ').length <= 2) s -= 3;
-
-    return s;
-  };
-
-  const cleaned = tags
-    // HARD PRODUCT LOCK
-    .filter(tag => tag.includes(product))
-
-    // REMOVE GENERIC
-    .filter(tag => !banned.has(tag))
-
-    // REMOVE SEMANTIC DUPES
-    .filter((tag, i, arr) =>
-      arr.findIndex(t =>
-        t.replace(product, '') === tag.replace(product, '')
-      ) === i
-    );
-
-  return cleaned
-    .map(tag => ({ tag, score: score(tag) }))
-    .sort((a, b) => b.score - a.score)
-    .map(x => x.tag)
-    .slice(0, 10);
+  // final product lock
+  return out.filter(t => t.includes(p)).slice(0, 10);
 }
